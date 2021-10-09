@@ -100,14 +100,58 @@
                       :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))})])
        (remove nil?) (into [])))
 
+(def node (xt/start-node {}))
+
+
+
 (comment
 
-  (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
+  (xt/q (xt/db node)
+        '{:find [name]
+          :where [[e :meetup/type :meeting]
+                  [e :meetup.meeting/name name]]})
+
+  (xt/q (xt/db node)
+        '{:find [name]
+          :where [[e :meetup/type :venue]
+                  [e :meetup.venue/name name]]})
+
+  (xt/q (xt/db node)
+        '{:find [name urlname id]
+          :where [[e :meetup/type :group]
+                  [e :meetup.group/name name]
+                  [e :meetup.group/urlname urlname]
+                  [e :meetup.group/id id]]})
+
+  (xt/q (xt/db node)
+        '{:find  [name v]
+          :where [[evt :meetup/type :meeting]
+                  [ven :xt/id v]
+                  [grp :xt/id g]
+                  [evt :meetup.venue/id v]
+                  [evt :meetup.group/id g]
+                  [ven :meetup.venue/name name]
+                  [grp :meetup.group/urlname "Clojure-nyc"]]})
+
+
+  #{
+    "Clojure-nyc"
+    "LispNYC"
+    "New-York-Emacs-Meetup"
+    "OWASP-New-York-City-Chapter"
+    "Papers-We-Love"
+    "TensorFlow-New-York"
+    }
+
+  (->> (dataset-reader {:meetup-group "Clojure-nyc" :status "past,upcoming"})
        (json/read-value )
        (sort-by :time #(compare %2 %1))
        #_(filter #(= (get (% "venue") "id") 1446724))
        #_(take 5)
-       (map meeting-document))
+       (map meeting-document)
+       (apply concat)
+       (into [])
+       (xt/submit-tx node))
 
   (group-document {"country" "us",
                    "created" 1291904633000,
