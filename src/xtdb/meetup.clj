@@ -2,15 +2,7 @@
   (:require [clj-http.client :as http]
             [clojure.java.io :as io]
             [jsonista.core :as json]
-            [xtdb.api :as xt])
-  (:import (java.io File)
-           (java.util.zip ZipInputStream)))
-
-(defn read-meetup-auth [^File file]
-  (map (json/read-value (slurp file)) ["username" "password"]))
-
-(def ^:dynamic *meetup-auth*
-  (some-> (System/getenv "MEETUP_AUTH_FILE") io/file read-meetup-auth))
+            [xtdb.api :as xt]))
 
 (def host "https://api.meetup.com")
 
@@ -19,8 +11,7 @@
   [{:keys [meetup-group status]}]
   (let [endpoint (str host (format "/%s/events" meetup-group))
         resp (http/get endpoint
-                       {:basic-auth   *meetup-auth*
-                        :query-params {"status" status}
+                       {:query-params {"status" status}
                         :as           :stream})]
     (io/reader (:body resp))))
 
