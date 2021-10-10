@@ -67,7 +67,7 @@
                  :meetup.venue/state                  state
                  :meetup.venue/zip                    zip})]))
 
-(defn meeting-document
+(defn event-document
   [{:strs [group id name description
            time local_date local_time utc_offset created updated
            status link is_online_event venue yes_rsvp_count waitlist_count
@@ -76,27 +76,27 @@
          (group-document group)
          (venue-document venue)
          [::xt/put (remove-nil-values
-                     {:xt/id                          (keyword (str "meetup/meeting-" id))
-                      :meetup/type                    :meeting
+                     {:xt/id                          (keyword (str "meetup/event-" id))
+                      :meetup/type                    :event
                       :meetup.group/id                (and group (keyword (str "meetup/group-" (group "id"))))
-                      :meetup.meeting/created         created
-                      :meetup.meeting/date_in_series_pattern date_in_series_pattern
-                      :meetup.meeting/description     description
-                      :meetup.meeting/id              id
-                      :meetup.meeting/is_online_event is_online_event
-                      :meetup.meeting/link            link
-                      :meetup.meeting/local_date      local_date
-                      :meetup.meeting/local_time      local_time
-                      :meetup.meeting/member_pay_fee  member_pay_fee
-                      :meetup.meeting/name            name
-                      :meetup.meeting/status          status
-                      :meetup.meeting/time            time
-                      :meetup.meeting/updated         updated
-                      :meetup.meeting/utc_offset      utc_offset
-                      :meetup.meeting/visibility      visibility
-                      :meetup.meeting/waitlist_count  waitlist_count
-                      :meetup.meeting/why             why
-                      :meetup.meeting/yes_rsvp_count  yes_rsvp_count
+                      :meetup.event/created         created
+                      :meetup.event/date_in_series_pattern date_in_series_pattern
+                      :meetup.event/description     description
+                      :meetup.event/id              id
+                      :meetup.event/is_online_event is_online_event
+                      :meetup.event/link            link
+                      :meetup.event/local_date      local_date
+                      :meetup.event/local_time      local_time
+                      :meetup.event/member_pay_fee  member_pay_fee
+                      :meetup.event/name            name
+                      :meetup.event/status          status
+                      :meetup.event/time            time
+                      :meetup.event/updated         updated
+                      :meetup.event/utc_offset      utc_offset
+                      :meetup.event/visibility      visibility
+                      :meetup.event/waitlist_count  waitlist_count
+                      :meetup.event/why             why
+                      :meetup.event/yes_rsvp_count  yes_rsvp_count
                       :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))})])
        (remove nil?) (into [])))
 
@@ -108,8 +108,8 @@
 
   (xt/q (xt/db node)
         '{:find [name]
-          :where [[e :meetup/type :meeting]
-                  [e :meetup.meeting/name name]]})
+          :where [[e :meetup/type :event]
+                  [e :meetup.event/name name]]})
 
   (xt/q (xt/db node)
         '{:find [name]
@@ -123,15 +123,17 @@
                   [e :meetup.group/urlname urlname]
                   [e :meetup.group/id id]]})
 
-  (xt/q (xt/db node)
-        '{:find  [name v]
-          :where [[evt :meetup/type :meeting]
-                  [ven :xt/id v]
-                  [grp :xt/id g]
-                  [evt :meetup.venue/id v]
-                  [evt :meetup.group/id g]
-                  [ven :meetup.venue/name name]
-                  [grp :meetup.group/urlname "Clojure-nyc"]]})
+  (->>
+    (xt/q (xt/db node)
+          '{:find  [name v]
+            :where [[evt :meetup/type :event]
+                    [ven :xt/id v]
+                    [grp :xt/id g]
+                    [evt :meetup.venue/id v]
+                    [evt :meetup.group/id g]
+                    [ven :meetup.venue/name name]
+                    [grp :meetup.group/urlname "LispNYC"]]})
+    sort)
 
 
   #{
@@ -143,12 +145,12 @@
     "TensorFlow-New-York"
     }
 
-  (->> (dataset-reader {:meetup-group "Clojure-nyc" :status "past,upcoming"})
+  (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
        (json/read-value )
        (sort-by :time #(compare %2 %1))
        #_(filter #(= (get (% "venue") "id") 1446724))
        #_(take 5)
-       (map meeting-document)
+       (map event-document)
        (apply concat)
        (into [])
        (xt/submit-tx node))
@@ -179,7 +181,7 @@
                    "state" "NY",
                    "zip" "10024"})
 
-  (meeting-document {"created"                1291907200000,
+  (event-document {"created"                  1291907200000,
                      "date_in_series_pattern" false,
                      "description"            "<p>Help celebrate another year of Lisp! Our annual holiday party will be held in the back room of P&amp;G's Lounge, food will be provided.</p> "
                      "group"                  {"created"            1291904633000,
@@ -220,5 +222,8 @@
                      "visibility"             "public",
                      "waitlist_count"         0,
                      "yes_rsvp_count"         3,})
+
+
+  (last "forkes")
 
   ,)

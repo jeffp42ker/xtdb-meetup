@@ -7,15 +7,15 @@ The utility pulls down all past and upcoming events data for a Meetup group as a
 
 The [XTDB Kaggle](https://github.com/xtdb/xtdb-kaggle) utility was used as a guide in modeling the Meetup data for XTDB.
 
-A Meetup Event document has nested Group data and usually Venue data as well. Separate documents for Meeting, Group and Venue are prepared for each Event as XTDB puts. While it is inefficient to submit many redundant group and venue puts it relieves us of determining which are new since the puts are idempotent.
+A Meetup Event document has nested Group data and usually Venue data as well. Separate documents for Event, Group and Venue are prepared for each Event as XTDB puts. While it is inefficient to submit many redundant group and venue puts it relieves us of determining which are new since the puts are idempotent.
 
-The documents are intended to be a system-of-record from Meetup so no transformation of values is performed apart from removing keys with `nil` values. CLean-up and transformations can be added in additional keys and values.
+The documents are intended to be a system-of-record from Meetup so no transformation of values is performed apart from removing keys with `nil` values. Clean-up and transformations can be added in additional keys and values.
 
-- Document types: `:meetup/type` `#{:meeting :venue :group}`
-- Document ids are in the form `:xt/id` `[:meetup/meeting-<id> :meetup/venue-<id> :meetup/group-<id>]`
-- Key prefixes: `#{ :meetup.meeting/` `:meetup.venue/` `:meetup.group/ }`.
+- Document types: `:meetup/type` `#{:event :venue :group}`
+- Document ids are in the form `:xt/id` `[:meetup/event-<id> :meetup/venue-<id> :meetup/group-<id>]`
+- Key prefixes: `#{ :meetup.event/` `:meetup.venue/` `:meetup.group/ }`.
 ```clojure
-(defn meeting-document
+(defn event-document
   [{:strs [group id name description
            time local_date local_time utc_offset created updated
            status link is_online_event venue yes_rsvp_count waitlist_count
@@ -27,24 +27,24 @@ The documents are intended to be a system-of-record from Meetup so no transforma
                      {:xt/id                          (keyword (str "meetup/meeting-" id))
                       :meetup/type                    :meeting
                       :meetup.group/id                (and group (keyword (str "meetup/group-" (group "id"))))
-                      :meetup.meeting/created         created
-                      :meetup.meeting/date_in_series_pattern date_in_series_pattern
-                      :meetup.meeting/description     description
-                      :meetup.meeting/id              id
-                      :meetup.meeting/is_online_event is_online_event
-                      :meetup.meeting/link            link
-                      :meetup.meeting/local_date      local_date
-                      :meetup.meeting/local_time      local_time
-                      :meetup.meeting/member_pay_fee  member_pay_fee
-                      :meetup.meeting/name            name
-                      :meetup.meeting/status          status
-                      :meetup.meeting/time            time
-                      :meetup.meeting/updated         updated
-                      :meetup.meeting/utc_offset      utc_offset
-                      :meetup.meeting/visibility      visibility
-                      :meetup.meeting/waitlist_count  waitlist_count
-                      :meetup.meeting/why             why
-                      :meetup.meeting/yes_rsvp_count  yes_rsvp_count
+                      :meetup.event/created         created
+                      :meetup.event/date_in_series_pattern date_in_series_pattern
+                      :meetup.event/description     description
+                      :meetup.event/id              id
+                      :meetup.event/is_online_event is_online_event
+                      :meetup.event/link            link
+                      :meetup.event/local_date      local_date
+                      :meetup.event/local_time      local_time
+                      :meetup.event/member_pay_fee  member_pay_fee
+                      :meetup.event/name            name
+                      :meetup.event/status          status
+                      :meetup.event/time            time
+                      :meetup.event/updated         updated
+                      :meetup.event/utc_offset      utc_offset
+                      :meetup.event/visibility      visibility
+                      :meetup.event/waitlist_count  waitlist_count
+                      :meetup.event/why             why
+                      :meetup.event/yes_rsvp_count  yes_rsvp_count
                       :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))})])
        (remove nil?) (into [])))
 ```
