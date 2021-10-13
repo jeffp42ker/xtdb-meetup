@@ -1,4 +1,4 @@
-(ns xtdb.auth-util
+(ns xtdb-meetup.auth-util
   (:import (java.io File)))
 
 (defn read-meetup-auth [^File file]
