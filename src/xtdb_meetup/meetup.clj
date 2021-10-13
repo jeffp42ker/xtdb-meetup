@@ -1,13 +1,14 @@
-(ns xtdb.meetup
+(ns xtdb-meetup.meetup
   (:require [clj-http.client :as http]
             [clojure.java.io :as io]
             [jsonista.core :as json]
             [xtdb.api :as xt]))
 
+; RESTful Meetup API v3
 (def host "https://api.meetup.com")
 
 (defn dataset-reader
-  "Retrieve group meetup events using deprecated V2 meetup api"
+  "Retrieve all group meetup events matching comma-delimited status \"past,upcoming\""
   [{:keys [meetup-group status]}]
   (let [endpoint (str host (format "/%s/events" meetup-group))
         resp (http/get endpoint
@@ -91,23 +92,48 @@
                       :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))})])
        (remove nil?) (into [])))
 
-(def node (xt/start-node {}))
+(defn start-xtdb!
+  []
+  (letfn [(kv-store [dir]
+            {:kv-store {:xtdb/module 'xtdb.rocksdb/->kv-store,
+                        :db-dir      (io/file dir),
+                        :sync?       true}})]
+    (xt/start-node
+      {:xtdb/tx-log         (kv-store "data/dev/tx-log"),
+       :xtdb/document-store (kv-store "data/dev/document-store"),
+       :xtdb/index-store    (kv-store "data/dev/index-store")})))
 
+(def xtdb-node (start-xtdb!))
 
+(defn stop-xtdb! []
+  (.close xtdb-node))
+
+(def ny-groups #{
+                 "Clojure-nyc"
+                 "LispNYC"
+                 "New-York-Emacs-Meetup"
+                 "OWASP-New-York-City-Chapter"
+                 "Papers-We-Love"
+                 "TensorFlow-New-York"
+                 })
 
 (comment
 
-  (xt/q (xt/db node)
+  (start-xtdb!)
+  (stop-xtdb!)
+
+
+  (xt/q (xt/db xtdb-node)
         '{:find [name]
           :where [[e :meetup/type :event]
                   [e :meetup.event/name name]]})
 
-  (xt/q (xt/db node)
+  (xt/q (xt/db xtdb-node)
         '{:find [name]
           :where [[e :meetup/type :venue]
                   [e :meetup.venue/name name]]})
 
-  (xt/q (xt/db node)
+  (xt/q (xt/db xtdb-node)
         '{:find [name urlname id]
           :where [[e :meetup/type :group]
                   [e :meetup.group/name name]
@@ -115,26 +141,22 @@
                   [e :meetup.group/id id]]})
 
   (->>
-    (xt/q (xt/db node)
-          '{:find  [name v]
+    (xt/q (xt/db xtdb-node)
+          '{:find  [name v (max date) (min date)]
             :where [[evt :meetup/type :event]
                     [ven :xt/id v]
                     [grp :xt/id g]
                     [evt :meetup.venue/id v]
                     [evt :meetup.group/id g]
                     [ven :meetup.venue/name name]
+                    [evt :meetup.event/local_date date]
                     [grp :meetup.group/urlname "LispNYC"]]})
     sort)
 
-
-  #{
-    "Clojure-nyc"
-    "LispNYC"
-    "New-York-Emacs-Meetup"
-    "OWASP-New-York-City-Chapter"
-    "Papers-We-Love"
-    "TensorFlow-New-York"
-    }
+ (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
+      (json/read-value)
+      (first)
+      (spit "test/data/event.edn"))
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
        (json/read-value )
@@ -144,77 +166,6 @@
        (map event-document)
        (apply concat)
        (into [])
-       (xt/submit-tx node))
+       (xt/submit-tx xtdb-node))
 
-  (group-document {"country" "us",
-                   "created" 1291904633000,
-                   "id" 1748515,
-                   "join_mode" "open"
-                   "lat" 40.75,
-                   "localized_location" "New York, NY",
-                   "lon" -73.98999786376953,
-                   "name" "LispNYC",
-                   "region" "en_US",
-                   "state" "NY",
-                   "timezone" "US/Eastern",
-                   "urlname" "LispNYC",
-                   "who" "Lispnycs",})
-
-  (venue-document {"address_1" "380 Columbus Ave (and 78th)",
-                   "city" "New York",
-                   "country" "us",
-                   "id" 1446724,
-                   "lat" 40.78126525878906,
-                   "localized_country_name" "USA",
-                   "lon" -73.97598266601562,
-                   "name" "P&G's Lounge",
-                   "repinned" false,
-                   "state" "NY",
-                   "zip" "10024"})
-
-  (event-document {"created"                  1291907200000,
-                     "date_in_series_pattern" false,
-                     "description"            "<p>Help celebrate another year of Lisp! Our annual holiday party will be held in the back room of P&amp;G's Lounge, food will be provided.</p> "
-                     "group"                  {"created"            1291904633000,
-                                               "who"                "Lispnycs",
-                                               "country"            "us",
-                                               "timezone"           "US/Eastern",
-                                               "id"                 1748515,
-                                               "localized_location" "New York, NY",
-                                               "name"               "LispNYC",
-                                               "lon"                -73.98999786376953,
-                                               "region"             "en_US",
-                                               "lat"                40.75,
-                                               "state"              "NY",
-                                               "urlname"            "LispNYC",
-                                               "join_mode"          "open"},
-                     "id"                     "jvqzpynqbsb",
-                     "is_online_event"        false,
-                     "link"                   "https://www.meetup.com/LispNYC/events/jvqzpynqbsb/",
-                     "local_date"             "2010-12-14",
-                     "local_time"             "19:00",
-                     "member_pay_fee"         false,
-                     "name"                   "LispNYC Holiday Party - 2010",
-                     "status"                 "past",
-                     "time"                   1292371200000,
-                     "updated"                1292375995000,
-                     "utc_offset"             -18000000,
-                     "venue"                  {"address_1"              "380 Columbus Ave (and 78th)",
-                                               "country"                "us",
-                                               "city"                   "New York",
-                                               "repinned"               false,
-                                               "id"                     1446724,
-                                               "name"                   "P&G's Lounge",
-                                               "localized_country_name" "USA",
-                                               "lon"                    -73.97598266601562,
-                                               "lat"                    40.78126525878906,
-                                               "state"                  "NY",
-                                               "zip"                    "10024"},
-                     "visibility"             "public",
-                     "waitlist_count"         0,
-                     "yes_rsvp_count"         3,})
-
-
-  (last "forkes")
-
-  ,)
+  (group-document (:group (slurp "test/data/event.edn"))))
