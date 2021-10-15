@@ -108,6 +108,42 @@
 (defn stop-xtdb! []
   (.close xtdb-node))
 
+(defn load-group-data [group]
+  (->> (dataset-reader {:meetup-group group :status "past,upcoming"})
+       (json/read-value )
+       (sort-by :time #(compare %2 %1))
+       (map event-document)
+       (apply concat)
+       (into [])
+       (xt/submit-tx xtdb-node)))
+
+(defn group-venues [group-name]
+  (->>
+    (xt/q
+      (xt/db xtdb-node)
+      '{:find  [(max ?date) (min ?date) (count ?date)
+                ?venue ?venue-name ?group ?group-name]
+        :in [?group-name]
+        :where [[?event :xt/id ?event-id]
+                [?event :meetup.event/local_date ?date]
+                [?event :meetup.venue/id ?venue]
+                [?event :meetup.group/id ?group]
+                [?venue :meetup.venue/name ?venue-name]
+                [?group :meetup.group/name ?group-name]]}
+      group-name)
+    (sort-by first)))
+
+(defn venue-events
+  "Events nested in venues, reverse direction using pull syntax"
+  []
+  (->>
+    (xt/q (xt/db xtdb-node)
+          '{:find  [(pull ?venue [:meetup.venue/id :meetup.venue/name
+                                  {(:meetup.venue/_id {:as :events, :into #{}})
+                                   [:meetup.event/local_date :meetup.event/name :meetup.event/id]}])]
+            :where [[?venue :meetup.venue/id]]})))
+
+
 (def ny-groups #{
                  "Clojure-nyc"
                  "LispNYC"
@@ -123,43 +159,43 @@
   (stop-xtdb!)
 
 
+  (load-group-data "Papers-We-Love")
+  (map load-group-data ny-groups)
+
+  (group-venues "LispNYC")
+  (venue-events)
+
+
   (xt/q (xt/db xtdb-node)
-        '{:find [name]
+        '{:find  [name]
           :where [[e :meetup/type :event]
                   [e :meetup.event/name name]]})
 
   (xt/q (xt/db xtdb-node)
-        '{:find [name]
+        '{:find  [name]
           :where [[e :meetup/type :venue]
                   [e :meetup.venue/name name]]})
 
   (xt/q (xt/db xtdb-node)
-        '{:find [name urlname id]
+        '{:find  [(pull ?venue [:meetup.venue/name
+                                :meetup.venue/id
+                                :meetup.venue/urlname])]
+          :where [[?venue :meetup.venue/urlname "Papers-We-Love"]]})
+
+  (xt/q (xt/db xtdb-node)
+        '{:find  [name urlname id]
           :where [[e :meetup/type :group]
                   [e :meetup.group/name name]
                   [e :meetup.group/urlname urlname]
                   [e :meetup.group/id id]]})
 
-  (->>
-    (xt/q (xt/db xtdb-node)
-          '{:find  [name v (max date) (min date)]
-            :where [[evt :meetup/type :event]
-                    [ven :xt/id v]
-                    [grp :xt/id g]
-                    [evt :meetup.venue/id v]
-                    [evt :meetup.group/id g]
-                    [ven :meetup.venue/name name]
-                    [evt :meetup.event/local_date date]
-                    [grp :meetup.group/urlname "LispNYC"]]})
-    sort)
-
- (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
-      (json/read-value)
-      (first)
-      (spit "test/data/event.edn"))
+  (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
+       (json/read-value)
+       (first)
+       (spit "test/data/event.edn"))
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
-       (json/read-value )
+       (json/read-value)
        (sort-by :time #(compare %2 %1))
        #_(filter #(= (get (% "venue") "id") 1446724))
        #_(take 5)
@@ -168,4 +204,4 @@
        (into [])
        (xt/submit-tx xtdb-node))
 
-  (group-document (:group (slurp "test/data/event.edn"))))
+,)
