@@ -20,77 +20,80 @@
   (->> m (partition 2) (apply concat) (filter #(some? (second %))) (into {})))
 
 (defn group-document
-  [{:strs [id name who localized_location state country region lat lon
-           timezone urlname join_mode created]}]
+  [{:strs [created name id join_mode lat lon urlname who
+           localized_location state country region timezone]}]
   (if id
     [::xt/put (remove-nil-values
                 {:xt/id                           (keyword (str "meetup/group-" id))
                  :meetup/type                     :group
-                 :meetup.group/id                 id
+                 :meetup.group/created            created
                  :meetup.group/name               name
+                 :meetup.group/id                 id
+                 :meetup.group/join_mode          join_mode
+                 :meetup.group/lat                lat
+                 :meetup.group/lon                lon
+                 :meetup.group/urlname            urlname
                  :meetup.group/who                who
                  :meetup.group/localized-location localized_location
                  :meetup.group/state              state
                  :meetup.group/country            country
                  :meetup.group/region             region
-                 :meetup.group/lat                lat
-                 :meetup.group/lon                lon
-                 :meetup-group/timezone           timezone
-                 :meetup.group/urlname            urlname
-                 :meetup.group/join_mode          join_mode
-                 :meetup.group/created            created})]))
+                 :meetup-group/timezone           timezone})]))
 
 (defn venue-document
-  [{:strs [id name localized_country_name repinned
-           address_1 city state zip country lat lon]}]
+  [{:strs [id name lat lon repinned address_1 city
+           country localized_country_name zip state]}]
   (if id
     [::xt/put (remove-nil-values
                 {:xt/id                               (keyword (str "meetup/venue-" id))
                  :meetup/type                         :venue
+                 :meetup.venue/id                     id
+                 :meetup.venue/name                   name
+                 :meetup.venue/lat                    lat
+                 :meetup.venue/lon                    lon
+                 :meetup.venue/repinned               repinned
                  :meetup.venue/address-1              address_1
                  :meetup.venue/city                   city
                  :meetup.venue/country                country
-                 :meetup.venue/id                     id
-                 :meetup.venue/lat                    lat
                  :meetup.venue/localized-country-name localized_country_name
-                 :meetup.venue/lon                    lon
-                 :meetup.venue/name                   name
-                 :meetup.venue/repinned               repinned
-                 :meetup.venue/state                  state
-                 :meetup.venue/zip                    zip})]))
+                 :meetup.venue/zip                    zip
+                 :meetup.venue/state                  state})]))
 
 (defn event-document
-  [{:strs [group id name description
-           time local_date local_time utc_offset created updated
-           status link is_online_event venue yes_rsvp_count waitlist_count
-           why visibility member_pay_fee date_in_series_pattern]}]
+  [{:strs [created duration id name date_in_series_pattern status time local_date local_time
+           updated utc_offset waitlist_count yes_rsvp_count venue is_online_event
+           group link description how_to_find_us visibility member_pay_fee why]}]
   (->> (list
          (group-document group)
          (venue-document venue)
          [::xt/put (remove-nil-values
                      {:xt/id                          (keyword (str "meetup/event-" id))
                       :meetup/type                    :event
-                      :meetup.group/id                (and group (keyword (str "meetup/group-" (group "id"))))
                       :meetup.event/created         created
-                      :meetup.event/date_in_series_pattern date_in_series_pattern
-                      :meetup.event/description     description
+                      :meetup.event/duration        duration
                       :meetup.event/id              id
-                      :meetup.event/is_online_event is_online_event
-                      :meetup.event/link            link
-                      :meetup.event/local_date      local_date
-                      :meetup.event/local_time      local_time
-                      :meetup.event/member_pay_fee  member_pay_fee
                       :meetup.event/name            name
+                      :meetup.event/date_in_series_pattern date_in_series_pattern
                       :meetup.event/status          status
                       :meetup.event/time            time
+                      :meetup.event/local_date      local_date
+                      :meetup.event/local_time      local_time
                       :meetup.event/updated         updated
                       :meetup.event/utc_offset      utc_offset
-                      :meetup.event/visibility      visibility
                       :meetup.event/waitlist_count  waitlist_count
-                      :meetup.event/why             why
                       :meetup.event/yes_rsvp_count  yes_rsvp_count
-                      :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))})])
+                      :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))
+                      :meetup.event/is_online_event is_online_event
+                      :meetup.group/id                (and group (keyword (str "meetup/group-" (group "id"))))
+                      :meetup.event/link            link
+                      :meetup.event/description     description
+                      :meetup.event/how_to_find_us  how_to_find_us
+                      :meetup.event/visibility      visibility
+                      :meetup.event/member_pay_fee  member_pay_fee
+                      :meetup.event/why             why})])
        (remove nil?) (into [])))
+
+(declare xtdb-node)
 
 (defn start-xtdb!
   []
@@ -102,8 +105,6 @@
       {:xtdb/tx-log         (kv-store "data/dev/tx-log"),
        :xtdb/document-store (kv-store "data/dev/document-store"),
        :xtdb/index-store    (kv-store "data/dev/index-store")})))
-
-(def xtdb-node (start-xtdb!))
 
 (defn stop-xtdb! []
   (.close xtdb-node))
@@ -140,8 +141,9 @@
     (xt/q (xt/db xtdb-node)
           '{:find  [(pull ?venue [:meetup.venue/id :meetup.venue/name
                                   {(:meetup.venue/_id {:as :events, :into #{}})
-                                   [:meetup.event/local_date :meetup.event/name :meetup.event/id]}])]
-            :where [[?venue :meetup.venue/id]]})))
+                                   [:meetup.event/local_date :meetup.event/name :meetup.event/id
+                                    :meetup.group/id]}])]
+            :where [[?venue :meetup.venue/id]]} )))
 
 
 (def ny-groups #{
@@ -155,7 +157,7 @@
 
 (comment
 
-  (start-xtdb!)
+  (def xtdb-node (start-xtdb!))
   (stop-xtdb!)
 
 
