@@ -1,4 +1,4 @@
-(ns xtdb-meetup.meetup
+(ns xtdb-meetup.extract
   (:require [clj-http.client :as http]
             [clojure.java.io :as io]
             [jsonista.core :as json]
@@ -67,8 +67,8 @@
          (group-document group)
          (venue-document venue)
          [::xt/put (remove-nil-values
-                     {:xt/id                          (keyword (str "meetup/event-" id))
-                      :meetup/type                    :event
+                     {:xt/id                        (keyword (str "meetup/event-" id))
+                      :meetup/type                  :event
                       :meetup.event/created         created
                       :meetup.event/duration        duration
                       :meetup.event/id              id
@@ -82,9 +82,9 @@
                       :meetup.event/utc_offset      utc_offset
                       :meetup.event/waitlist_count  waitlist_count
                       :meetup.event/yes_rsvp_count  yes_rsvp_count
-                      :meetup.venue/id                (and venue (keyword (str "meetup/venue-" (venue "id"))))
+                      :meetup.venue/id              (if venue (keyword (str "meetup/venue-" (venue "id"))))
                       :meetup.event/is_online_event is_online_event
-                      :meetup.group/id                (and group (keyword (str "meetup/group-" (group "id"))))
+                      :meetup.group/id              (if group (keyword (str "meetup/group-" (group "id"))))
                       :meetup.event/link            link
                       :meetup.event/description     description
                       :meetup.event/how_to_find_us  how_to_find_us
@@ -118,34 +118,6 @@
        (into [])
        (xt/submit-tx xtdb-node)))
 
-(defn group-venues [group-name]
-  (->>
-    (xt/q
-      (xt/db xtdb-node)
-      '{:find  [(max ?date) (min ?date) (count ?date)
-                ?venue ?venue-name ?group ?group-name]
-        :in [?group-name]
-        :where [[?event :xt/id ?event-id]
-                [?event :meetup.event/local_date ?date]
-                [?event :meetup.venue/id ?venue]
-                [?event :meetup.group/id ?group]
-                [?venue :meetup.venue/name ?venue-name]
-                [?group :meetup.group/name ?group-name]]}
-      group-name)
-    (sort-by first)))
-
-(defn venue-events
-  "Events nested in venues, reverse direction using pull syntax"
-  []
-  (->>
-    (xt/q (xt/db xtdb-node)
-          '{:find  [(pull ?venue [:meetup.venue/id :meetup.venue/name
-                                  {(:meetup.venue/_id {:as :events, :into #{}})
-                                   [:meetup.event/local_date :meetup.event/name :meetup.event/id
-                                    :meetup.group/id]}])]
-            :where [[?venue :meetup.venue/id]]} )))
-
-
 (def ny-groups #{
                  "Clojure-nyc"
                  "LispNYC"
@@ -163,33 +135,6 @@
 
   (load-group-data "Papers-We-Love")
   (map load-group-data ny-groups)
-
-  (group-venues "LispNYC")
-  (venue-events)
-
-
-  (xt/q (xt/db xtdb-node)
-        '{:find  [name]
-          :where [[e :meetup/type :event]
-                  [e :meetup.event/name name]]})
-
-  (xt/q (xt/db xtdb-node)
-        '{:find  [name]
-          :where [[e :meetup/type :venue]
-                  [e :meetup.venue/name name]]})
-
-  (xt/q (xt/db xtdb-node)
-        '{:find  [(pull ?venue [:meetup.venue/name
-                                :meetup.venue/id
-                                :meetup.venue/urlname])]
-          :where [[?venue :meetup.venue/urlname "Papers-We-Love"]]})
-
-  (xt/q (xt/db xtdb-node)
-        '{:find  [name urlname id]
-          :where [[e :meetup/type :group]
-                  [e :meetup.group/name name]
-                  [e :meetup.group/urlname urlname]
-                  [e :meetup.group/id id]]})
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
        (json/read-value)
