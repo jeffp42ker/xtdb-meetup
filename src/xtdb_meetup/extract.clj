@@ -2,7 +2,8 @@
   (:require [clj-http.client :as http]
             [clojure.java.io :as io]
             [jsonista.core :as json]
-            [xtdb.api :as xt]))
+            [xtdb.api :as xt]
+            [xtdb-meetup.core :as xtdb-meetup]))
 
 ; RESTful Meetup API v3
 (def host "https://api.meetup.com")
@@ -95,20 +96,6 @@
 
 (declare xtdb-node)
 
-(defn start-xtdb!
-  []
-  (letfn [(kv-store [dir]
-            {:kv-store {:xtdb/module 'xtdb.rocksdb/->kv-store,
-                        :db-dir      (io/file dir),
-                        :sync?       true}})]
-    (xt/start-node
-      {:xtdb/tx-log         (kv-store "data/dev/tx-log"),
-       :xtdb/document-store (kv-store "data/dev/document-store"),
-       :xtdb/index-store    (kv-store "data/dev/index-store")})))
-
-(defn stop-xtdb! []
-  (.close xtdb-node))
-
 (defn load-group-data [group]
   (->> (dataset-reader {:meetup-group group :status "past,upcoming"})
        (json/read-value )
@@ -129,8 +116,8 @@
 
 (comment
 
-  (def xtdb-node (start-xtdb!))
-  (stop-xtdb!)
+  (def xtdb-node (xtdb-meetup/start-xtdb!))
+  (xtdb-meetup/stop-xtdb!)
 
 
   (load-group-data "Papers-We-Love")

@@ -1,10 +1,8 @@
 (ns xtdb-meetup.query
   (:require [xtdb.api :as xt]
-            [xtdb-meetup.extract :as extract]))
+            [xtdb-meetup.core :as xtdb-meetup]))
 
 (declare xtdb-node)
-
-(def xtdb-node extract/xtdb-node)
 
 (defn group-venues [group-name]
   (->>
@@ -48,6 +46,12 @@
           name)
     (sort-by first)))
 
+(defn all-venues []
+  (apply concat (xt/q (xt/db xtdb-node)
+                '{:find  [(pull ?venue [*])]
+                  :where [[?venue :meetup.venue/name]]})))
+
+
 (defn venue-map [name]
   (ffirst (xt/q (xt/db xtdb-node)
                 '{:find  [(pull ?venue [*])]
@@ -64,15 +68,20 @@
                  "TensorFlow-New-York"
                  })
 
-(comment
+(defn venues-with-attributes-having-duplicate-values []
+  (filter (fn [m] (= (:meetup.venue/name m)
+                     (:meetup.venue/address-1 m))) (all-venues)))
 
-  (def xtdb-node (start-xtdb!))
-  (stop-xtdb!)
+(comment
+  (def xtdb-node (xtdb-meetup/start-xtdb!))
+  (xtdb-meetup/stop-xtdb!)
 
   (group-venues "LispNYC")
   (venue-events)
+  (venues-with-attributes-having-duplicate-values)
   (events-at-venue "Shareablee")
-
+  (filter (fn [m] (= (:meetup.venue/name m)
+                     (:meetup.venue/address-1 m))) (all-venues))
   (venue-map "Pierre's Roofdeck")
 
   (xt/q (xt/db xtdb-node)
