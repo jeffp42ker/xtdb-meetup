@@ -2,23 +2,68 @@
 
 A small XTDB utility to extract the basic Events dataset for a Meetup group and turn it into XTDB transaction operations.
 
-The utility pulls down all past and upcoming events data for a Meetup group as a list of Json maps by making a single request to the RESTful Meetup API v3.
-
+The utility pulls down all past and upcoming events data for a Meetup group as a list of Json maps by making a single RESTful request to the Meetup API v3.
 
 The [XTDB Kaggle](https://github.com/xtdb/xtdb-kaggle) utility was used as a guide in modeling the Meetup data for XTDB.
 
-A Meetup Event document has nested Group data and usually Venue data as well. Each event's data is normalized into separate XTDB document puts for Event, Group and Venue. The puts are [idempotent](https://en.wikipedia.org/wiki/Idempotence) so the redundant Group and Venue document puts with each Event do not duplicate data in the database.
+A Meetup Event document has nested Group data and usually Venue data as well. Each event's data is normalized into separate XTDB document puts for Event, Group and Venue. The puts are [idempotent](https://en.wikipedia.org/wiki/Idempotence) so the redundant puts for Group and Venue documents with each Event put does not duplicate data in the database.
 
-These Meetup-sourced document attributes are intended as a system-of-record so no value transformation is performed apart from removing keys with `nil` values. Clean-up and transformations can be added in additional keys and values.
+These Meetup-sourced document attributes are intended as a system-of-record so no value transformation is performed apart from removing keys with `nil` values. Clean-up and transformations can be added as additional keys and values.
 
 - Document types: `{:meetup/type #{ :event :venue :group }}`
-- Document ids are in the form `{:xt/id #{ :meetup/event-<id> :meetup/venue-<id> :meetup/group-<id> }`
-- Meetup Key prefixes: `#{ :meetup.event/<key> :meetup.venue/<key> :meetup.group/<key> }`.
+- Document ids: `{:xt/id #{ :meetup/event-<id> :meetup/venue-<id> :meetup/group-<id> }`
+- Meetup key prefixes: `#{ :meetup.event/<key> :meetup.venue/<key> :meetup.group/<key> }`.
 
 Meetup API: `https://api.meetup.com/<GROUP_URLNAME>/events?status=past,upcoming`
 
-Attributes mapped in XTDB documents:
+### Attributes mapped in XTDB documents
 
+### :group
+
+```clojure
+(defn group-document
+  [{:strs [created name id join_mode lat lon urlname who
+           localized_location state country region timezone]}]
+  (if id
+    [::xt/put (remove-nil-values
+                {:xt/id                           (keyword (str "meetup/group-" id))
+                 :meetup/type                     :group
+                 :meetup.group/created            created
+                 :meetup.group/name               name
+                 :meetup.group/id                 id
+                 :meetup.group/join_mode          join_mode
+                 :meetup.group/lat                lat
+                 :meetup.group/lon                lon
+                 :meetup.group/urlname            urlname
+                 :meetup.group/who                who
+                 :meetup.group/localized-location localized_location
+                 :meetup.group/state              state
+                 :meetup.group/country            country
+                 :meetup.group/region             region
+                 :meetup-group/timezone           timezone})]))
+```
+### :venue
+```clojure
+(defn venue-document
+  [{:strs [id name lat lon repinned address_1 city
+           country localized_country_name zip state]}]
+  (if id
+    [::xt/put (remove-nil-values
+                {:xt/id                               (keyword (str "meetup/venue-" id))
+                 :meetup/type                         :venue
+                 :meetup.venue/id                     id
+                 :meetup.venue/name                   name
+                 :meetup.venue/lat                    lat
+                 :meetup.venue/lon                    lon
+                 :meetup.venue/repinned               repinned
+                 :meetup.venue/address-1              address_1
+                 :meetup.venue/city                   city
+                 :meetup.venue/country                country
+                 :meetup.venue/localized-country-name localized_country_name
+                 :meetup.venue/zip                    zip
+                 :meetup.venue/state                  state})]))
+```
+### :event
 ```clojure
 (defn event-document
   [{:strs [created duration id name date_in_series_pattern status time local_date local_time
@@ -53,48 +98,4 @@ Attributes mapped in XTDB documents:
                       :meetup.event/member_pay_fee  member_pay_fee
                       :meetup.event/why             why})])
        (remove nil?) (into [])))
-```
-
-
-```clojure
-(defn group-document
-  [{:strs [created name id join_mode lat lon urlname who
-           localized_location state country region timezone]}]
-  (if id
-    [::xt/put (remove-nil-values
-                {:xt/id                           (keyword (str "meetup/group-" id))
-                 :meetup/type                     :group
-                 :meetup.group/created            created
-                 :meetup.group/name               name
-                 :meetup.group/id                 id
-                 :meetup.group/join_mode          join_mode
-                 :meetup.group/lat                lat
-                 :meetup.group/lon                lon
-                 :meetup.group/urlname            urlname
-                 :meetup.group/who                who
-                 :meetup.group/localized-location localized_location
-                 :meetup.group/state              state
-                 :meetup.group/country            country
-                 :meetup.group/region             region
-                 :meetup-group/timezone           timezone})]))
-```
-```clojure
-(defn venue-document
-  [{:strs [id name lat lon repinned address_1 city state zip
-           country localized_country_name]}]
-  (if id
-    [::xt/put (remove-nil-values
-                {:xt/id                               (keyword (str "meetup/venue-" id))
-                 :meetup/type                         :venue
-                 :meetup.venue/id                     id
-                 :meetup.venue/name                   name
-                 :meetup.venue/lat                    lat
-                 :meetup.venue/lon                    lon
-                 :meetup.venue/repinned               repinned
-                 :meetup.venue/address-1              address_1
-                 :meetup.venue/city                   city
-                 :meetup.venue/state                  state
-                 :meetup.venue/zip                    zip
-                 :meetup.venue/country                country
-                 :meetup.venue/localized-country-name localized_country_name})]))
 ```

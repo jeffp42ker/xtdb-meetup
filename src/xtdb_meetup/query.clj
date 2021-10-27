@@ -25,11 +25,12 @@
   []
   (->>
     (xt/q (xt/db xtdb-node)
-          '{:find  [(pull ?venue [:xtdb/id #_:meetup.venue/name
+          '{:find  [?group-name (pull ?venue [:xt/id :meetup.venue/name
                                   {(:meetup.venue/_id {:as :events, :into #{}})
-                                   [:meetup.event/time :meetup.event/name :meetup.event/id
-                                    #_:meetup.group/id]}])]
-            :where [[?venue :meetup.venue/id]]} )))
+                                   [:meetup.event/time :meetup.event/name :meetup.event/id ]}])]
+            :where [[?event :meetup.venue/id ?venue]
+                    [?event :meetup.group/id ?group]
+                    [?group :meetup.group/name ?group-name]]} )))
 
 (defn events-at-venue
   [name]
@@ -84,17 +85,34 @@
                      (:meetup.venue/address-1 m))) (all-venues))
   (venue-map "Pierre's Roofdeck")
 
+
+  :meetup/event-210221942
+
   (xt/q (xt/db xtdb-node)
         '{:find  [(pull ?venue [*])]
           :in [name]
           :where [[?venue :meetup.venue/name name]]} "Pierre's Roofdeck")
+
+
+  (xt/q (xt/db xtdb-node)
+        '{:find  [(pull ?event [*]) group-name]
+          :where [[?event :xt/id :meetup/event-210221942]
+                  [?event :meetup.group/id ?group]
+                  [?group :meetup.group/name group-name]
+                  ]})
 
   (xt/q (xt/db xtdb-node)
         '{:find  [(pull ?group [*])]
           :where [[?group :meetup.group/name]]})
 
   (xt/q (xt/db xtdb-node)
-        '{:find [e] :where [[e :meetup/type :event]]})
+        '{:find [?event venue-name group-name event-name]
+          :where [[?event :meetup/type :event]
+                  [?event :meetup.venue/id ?venue]
+                  [?event :meetup.group/id ?group]
+                  [?event :meetup.event/name event-name]
+                  [?venue :meetup.venue/name venue-name]
+                  [?group :meetup.group/name group-name]]})
 
   (xt/q (xt/db xtdb-node)
         '{:find  [(pull ?venue [:meetup.venue/name
