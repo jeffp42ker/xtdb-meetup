@@ -1,8 +1,6 @@
 (ns xtdb-meetup.query
   (:require [xtdb.api :as xt]
-            [xtdb-meetup.core :as xtdb-meetup]))
-
-(declare xtdb-node)
+            [xtdb-meetup.core :refer [xtdb-node ny-groups]]))
 
 (defn group-venues [group-name]
   (->>
@@ -60,26 +58,17 @@
                   :where [[?venue :meetup.venue/name name]]}
                 name)))
 
-(def ny-groups #{
-                 "Clojure-nyc"
-                 "LispNYC"
-                 "New-York-Emacs-Meetup"
-                 "OWASP-New-York-City-Chapter"
-                 "Papers-We-Love"
-                 "TensorFlow-New-York"
-                 })
+
 
 (defn venues-with-attributes-having-duplicate-values []
   (filter (fn [m] (= (:meetup.venue/name m)
                      (:meetup.venue/address-1 m))) (all-venues)))
 
 (comment
-  (def xtdb-node (xtdb-meetup/start-xtdb!))
-  (xtdb-meetup/stop-xtdb!)
 
   (group-venues "LispNYC")
   (venue-events)
-  (venues-with-attributes-having-duplicate-values)
+  (count (venues-with-attributes-having-duplicate-values))
   (events-at-venue "Shareablee")
   (filter (fn [m] (= (:meetup.venue/name m)
                      (:meetup.venue/address-1 m))) (all-venues))

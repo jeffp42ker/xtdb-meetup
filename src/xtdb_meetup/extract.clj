@@ -3,7 +3,7 @@
             [clojure.java.io :as io]
             [jsonista.core :as json]
             [xtdb.api :as xt]
-            [xtdb-meetup.core :as xtdb-meetup]))
+            [xtdb-meetup.core :refer [xtdb-node ny-groups]]))
 
 ; RESTful Meetup API v3
 (def host "https://api.meetup.com")
@@ -23,7 +23,7 @@
 (defn group-document
   [{:strs [created name id join_mode lat lon urlname who
            localized_location state country region timezone]}]
-  (if id
+  (when id
     [::xt/put (remove-nil-values
                 {:xt/id                           (keyword (str "meetup/group-" id))
                  :meetup/type                     :group
@@ -44,7 +44,7 @@
 (defn venue-document
   [{:strs [id name lat lon repinned address_1 city
            country localized_country_name zip state]}]
-  (if id
+  (when id
     [::xt/put (remove-nil-values
                 {:xt/id                               (keyword (str "meetup/venue-" id))
                  :meetup/type                         :venue
@@ -83,9 +83,9 @@
                       :meetup.event/utc_offset      utc_offset
                       :meetup.event/waitlist_count  waitlist_count
                       :meetup.event/yes_rsvp_count  yes_rsvp_count
-                      :meetup.venue/id              (if venue (keyword (str "meetup/venue-" (venue "id"))))
+                      :meetup.venue/id              (when venue (keyword (str "meetup/venue-" (venue "id"))))
                       :meetup.event/is_online_event is_online_event
-                      :meetup.group/id              (if group (keyword (str "meetup/group-" (group "id"))))
+                      :meetup.group/id              (when group (keyword (str "meetup/group-" (group "id"))))
                       :meetup.event/link            link
                       :meetup.event/description     description
                       :meetup.event/how_to_find_us  how_to_find_us
@@ -94,7 +94,6 @@
                       :meetup.event/why             why})])
        (remove nil?) (into [])))
 
-(declare xtdb-node)
 
 (defn load-group-data [group]
   (->> (dataset-reader {:meetup-group group :status "past,upcoming"})
@@ -105,23 +104,15 @@
        (into [])
        (xt/submit-tx xtdb-node)))
 
-(def ny-groups #{
-                 "Clojure-nyc"
-                 "LispNYC"
-                 "New-York-Emacs-Meetup"
-                 "OWASP-New-York-City-Chapter"
-                 "Papers-We-Love"
-                 "TensorFlow-New-York"
-                 })
+(defn load-ny-groups []
+  (map load-group-data ny-groups))
 
 (comment
 
-  (def xtdb-node (xtdb-meetup/start-xtdb!))
-  (xtdb-meetup/stop-xtdb!)
-
-
+  (load-ny-groups)
   (load-group-data "Papers-We-Love")
-  (map load-group-data ny-groups)
+  (load-group-data "LispNYC")
+  
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
        (json/read-value)

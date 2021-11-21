@@ -18,3 +18,24 @@
 
 (defn stop-xtdb! []
   (.close xtdb-node))
+
+(def ny-groups #{"Clojure-nyc"
+                 "LispNYC"
+                 "New-York-Emacs-Meetup"
+                 "OWASP-New-York-City-Chapter"
+                 "Papers-We-Love"
+                 "TensorFlow-New-York"})
+
+(comment
+
+  (def xtdb-node (start-xtdb!))
+  
+  (stop-xtdb!)
+
+  )
+ 
+  
+
+
+  
+  
