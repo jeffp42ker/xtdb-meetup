@@ -2,18 +2,39 @@
   (:require [clj-http.client :as http]
             [clojure.java.io :as io]
             [jsonista.core :as json]
+            [portal.api :as p]
             [xtdb.api :as xt]
-            [xtdb-meetup.core :refer [xtdb-node ny-groups]]))
+            [xtdb-meetup.auth-util :refer [*meetup-auth*]]
+            [xtdb-meetup.core :refer [xtdb-node]]))
+
+(comment
+  (p/open {:launcher :vscode})
+  (add-tap #'p/submit)
+  
+  ,)
+
 
 ; RESTful Meetup API v3
 (def host "https://api.meetup.com")
+
+
+(defn group-urlnames []
+  (let [re4 #"<span class=\"prop\">\"urlname\"<\/span>: <span class=\"string\">\"([^\"]+)\"<\/span>"
+        html (slurp "data/dev/groups/tech-34-20211125.html")]
+    (map (fn [[_ a]]
+           [a]) (re-seq re4 html))))
+
+(comment
+  (tap> (group-urlnames))
+  )
 
 (defn dataset-reader
   "Retrieve all group meetup events matching comma-delimited status \"past,upcoming\""
   [{:keys [meetup-group status]}]
   (let [endpoint (str host (format "/%s/events" meetup-group))
         resp (http/get endpoint
-                       {:query-params {"status" status}
+                       {:basic-auth *meetup-auth*
+                        :query-params {"status" status}
                         :as           :stream})]
     (io/reader (:body resp))))
 
@@ -94,39 +115,31 @@
                       :meetup.event/why             why})])
        (remove nil?) (into [])))
 
-
 (defn load-group-data [group]
   (->> (dataset-reader {:meetup-group group :status "past,upcoming"})
        (json/read-value )
        (sort-by :time #(compare %2 %1))
-       (map event-document)
-       (apply concat)
-       (into [])
-       (xt/submit-tx xtdb-node)))
-
-(defn load-ny-groups []
-  (map load-group-data ny-groups))
+       #_ (map event-document)
+       #_(apply concat)
+       #_(into [])
+       #_(xt/submit-tx xtdb-node)))
 
 (comment
 
-  (load-ny-groups)
   (load-group-data "Papers-We-Love")
   (load-group-data "LispNYC")
-  
+  (load-group-data "dashing-whippets")
+  (tap> (load-group-data "Kaggle-NYC"))
+  (tap> (load-group-data "nyhackr"))
+  (tap> (load-group-data "Black-Designers-in-Tech-NYC"))
+  (load-group-data "Build-with-Code-New-York")
+  (load-group-data "BlockchainNYC")
+
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
        (json/read-value)
        (first)
        (spit "test/data/event.edn"))
-
-  (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
-       (json/read-value)
-       (sort-by :time #(compare %2 %1))
-       #_(filter #(= (get (% "venue") "id") 1446724))
-       #_(take 5)
-       (map event-document)
-       (apply concat)
-       (into [])
-       (xt/submit-tx xtdb-node))
+  
 
 ,)
