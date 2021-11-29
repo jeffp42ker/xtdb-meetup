@@ -2,27 +2,19 @@
   (:require [clj-http.client :as http]
             [clojure.java.io :as io]
             [jsonista.core :as json]
-            [portal.api :as p]
             [xtdb.api :as xt]
             [xtdb-meetup.auth-util :refer [*meetup-auth*]]
             [xtdb-meetup.core :refer [xtdb-node]]))
-
-(comment
-  (p/open {:launcher :vscode})
-  (add-tap #'p/submit)
-  
-  ,)
-
 
 ; RESTful Meetup API v3
 (def host "https://api.meetup.com")
 
 
 (defn group-urlnames []
-  (let [re4 #"<span class=\"prop\">\"urlname\"<\/span>: <span class=\"string\">\"([^\"]+)\"<\/span>"
-        html (slurp "data/dev/groups/tech-34-20211125.html")]
+  (let [re #"<span class=\"prop\">\"urlname\"<\/span>: <span class=\"string\">\"([^\"]+)\"<\/span>"
+        html (slurp "data/groups/category-34-tech-20211125.html")]
     (map (fn [[_ a]]
-           [a]) (re-seq re4 html))))
+           [a]) (re-seq re html))))
 
 (comment
   (tap> (group-urlnames))
@@ -119,10 +111,10 @@
   (->> (dataset-reader {:meetup-group group :status "past,upcoming"})
        (json/read-value )
        (sort-by :time #(compare %2 %1))
-       #_ (map event-document)
-       #_(apply concat)
-       #_(into [])
-       #_(xt/submit-tx xtdb-node)))
+       (map event-document)
+       (apply concat)
+       (into [])
+       (xt/submit-tx xtdb-node)))
 
 (comment
 

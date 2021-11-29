@@ -1,30 +1,41 @@
 (ns xtdb-meetup.query
   (:require
-   [portal.api :as p]
    [xtdb.api :as xt]
    [xtdb-meetup.core :refer [xtdb-node]]
    [xtdb-meetup.util :as util]))
 
-(comment
-  (p/open {:launcher :vscode})
-  (add-tap #'p/submit)
-  )
-
 (defn group-venues [group-urlname]
-  (->>
-   (xt/q
-    (xt/db xtdb-node)
-    '{:find  [(max ?date) (min ?date) (count ?date)
-              ?venue ?venue-name ?group ?group-name]
-      :in [?group-urlname]
-      :where [[?group :meetup.group/urlname ?group-urlname]
-              [?event :meetup.group/id ?group]
-              [?event :meetup.venue/id ?venue]
-              [?event :meetup.event/local_date ?date]
-              [?group :meetup.group/name ?group-name]
-              [?venue :meetup.venue/name ?venue-name]]}
-    group-urlname)
-   (sort-by first)))
+  (let [headings [:urlname :max-date :min-date :meeting-count :coord :name-address]
+        f-headers (fn [m] (into {} (mapv hash-map headings m)))]
+    (->> (map (fn [[_ group-urlname max-date min-date count _ name address-1 lat lon]]
+                [group-urlname
+                 max-date min-date count
+                 (str lat "," lon)
+                 (str name ", " address-1)])
+              (xt/q (xt/db xtdb-node)
+                    '{:find [#_(pull ?event [*])
+                             ?group group-urlname
+                             (max local_date)
+                             (min local_date)
+                             (count ?event)
+                             ?venue venue-name address-1
+                             lat lon
+                             #_(pull ?venue [*])]
+                      :in [group-urlname]
+                      :where [[?group :meetup.group/urlname group-urlname]
+                              [?event :meetup.group/id ?group]
+                              [?event :meetup.event/name event-name]
+                              [?event :meetup.venue/id ?venue]
+                              [?venue :meetup.venue/name venue-name]
+                              [?venue :meetup.venue/address-1 address-1]
+                              #_[?event :meetup.event/is_online_event false]
+                              [?venue :meetup.venue/lat lat]
+                              [?venue :meetup.venue/lon lon]
+                              [?event :meetup.event/local_date local_date]]}
+                    group-urlname))
+         (sort-by second #(compare %2 %1))
+         (mapv f-headers)
+         (sort-by :meeting-count #(compare %2 %1)))))
 
 (defn venue-events
   "Events nested in venues, reverse direction using pull syntax"
@@ -78,7 +89,9 @@
   (count (all-venues))
 
 
-  (->> (group-venues "nyhackr") #_ tap>)
+  (->> (group-venues "nyhackr") tap>)
+  ;; => true
+
   (->> (group-venues "LispNYC") #_ tap>)
 
   (tap> (venue-events))
@@ -107,33 +120,7 @@
               '{:find  [(pull ?group [*])]
                 :where [[?group :meetup.group/name]]}))
 
-  (tap> (map (fn [[_ group-urlname max-date min-date count _ name address-1 lat lon]]
-               [group-urlname
-                max-date min-date count
-                (str lat "," lon)
-                (str name "," address-1)])
-             (xt/q (xt/db xtdb-node)
-                   '{:find [#_(pull ?event [*])
-                            ?group group-urlname
-                            (max local_date)
-                            (min local_date)
-                            (count ?event)
-                            ?venue venue-name address-1
-                            lat lon
-                            #_(pull ?venue [*])
-                            ]
-                     :in [group-urlname]
-                     :where [[?group :meetup.group/urlname group-urlname]
-                             [?event :meetup.group/id ?group]
-                             [?event :meetup.event/name event-name]
-                             [?event :meetup.venue/id ?venue]
-                             [?venue :meetup.venue/name venue-name]
-                             [?venue :meetup.venue/address-1 address-1]
-                             #_[?event :meetup.event/is_online_event false]
-                             [?venue :meetup.venue/lat lat]
-                             [?venue :meetup.venue/lon lon]
-                             [?event :meetup.event/local_date local_date]]}
-                   "Build-with-Code-New-York")))
+  
 
 
   (xt/q (xt/db xtdb-node)
@@ -175,6 +162,6 @@
           :where [[e :meetup/type :group]
                   [e :meetup.group/name name]
                   [e :meetup.group/urlname urlname]
-                  [e :meetup.group/id id]]})
-  )
+                  [e :meetup.group/id id]]}))
+  
 
