@@ -15,6 +15,7 @@
               (xt/q (xt/db xtdb-node)
                     '{:find [#_(pull ?event [*])
                              ?group group-urlname
+
                              (max local_date)
                              (min local_date)
                              (count ?event)
@@ -64,12 +65,21 @@
    (sort-by first)))
 
 (defn all-venues []
-  (apply concat (xt/q (xt/db xtdb-node)
-                      '{:find  [group-name (pull ?venue [*])]
-                        :where [[?event :meetup.group/id ?group]
-                                [?event :meetup.venue/id ?venue]
-                                [?group :meetup.group/name group-name]
-                                [?venue :meetup.venue/name]]})))
+  (xt/q (xt/db xtdb-node)
+        '{:find  [group-name (pull ?venue [*])]
+          :where [[?event :meetup.group/id ?group]
+                  [?event :meetup.venue/id ?venue]
+                  [?group :meetup.group/name group-name]
+                  [?venue :meetup.venue/name]]}))
+
+(defn venues-without-a-name []
+  (xt/q (xt/db xtdb-node)
+        '{:find  [group-name (pull ?venue [*])]
+          :where [[?event :meetup.group/id ?group]
+                  [?event :meetup.venue/id ?venue]
+                  [?group :meetup.group/name group-name]
+                  [?venue :meetup.venue/name venue-name]
+                  [?venue :meetup.venue/address-1 venue-name]]}))
 
 (defn venue-map [name]
   (ffirst (xt/q (xt/db xtdb-node)
@@ -84,6 +94,9 @@
 
 (comment
 
+  (venues-without-a-name)
+
+
   (->> (venue-map "Jane Street") tap>)
 
   (count (all-venues))
@@ -91,12 +104,19 @@
 
   (->> (group-venues "nyhackr") tap>)
   ;; => true
+;;BUIDL
+  (->> (group-venues "flatironschool")
+       (sort-by :max-date #(compare %2 %1))
+       tap>)
 
-  (->> (group-venues "LispNYC") #_ tap>)
+  (->> (group-venues "LispNYC")
+       (sort-by :max-date #(compare %2 %1))
+       (take 5)
+       tap>)
 
   (tap> (venue-events))
 
-  (->> (all-venues) tap>)
+  (->> (all-venues) (take 4) #_tap>)
 
   (tap> (venues-with-attributes-having-duplicate-values))
 
@@ -120,7 +140,7 @@
               '{:find  [(pull ?group [*])]
                 :where [[?group :meetup.group/name]]}))
 
-  
+
 
 
   (xt/q (xt/db xtdb-node)
@@ -162,6 +182,8 @@
           :where [[e :meetup/type :group]
                   [e :meetup.group/name name]
                   [e :meetup.group/urlname urlname]
-                  [e :meetup.group/id id]]}))
+                  [e :meetup.group/id id]]})
+
+  )
   
 

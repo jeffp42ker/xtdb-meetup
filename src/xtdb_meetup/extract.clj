@@ -13,8 +13,7 @@
 (defn group-urlnames []
   (let [re #"<span class=\"prop\">\"urlname\"<\/span>: <span class=\"string\">\"([^\"]+)\"<\/span>"
         html (slurp "data/groups/category-34-tech-20211125.html")]
-    (map (fn [[_ a]]
-           [a]) (re-seq re html))))
+    (map (fn [[_ a]] a) (re-seq re html))))
 
 (comment
   (tap> (group-urlnames))
@@ -23,12 +22,31 @@
 (defn dataset-reader
   "Retrieve all group meetup events matching comma-delimited status \"past,upcoming\""
   [{:keys [meetup-group status]}]
-  (let [endpoint (str host (format "/%s/events" meetup-group))
-        resp (http/get endpoint
-                       {:basic-auth *meetup-auth*
-                        :query-params {"status" status}
-                        :as           :stream})]
-    (io/reader (:body resp))))
+  (when true #_(not (some #{"ethbuilders"} [meetup-group]))
+    (let [endpoint (str host (format "/%s/events" meetup-group))
+          stat (:status (http/head (str host "/" meetup-group) {:throw-exceptions false}))
+          resp (when (= 200 stat)
+                 (http/get endpoint
+                           {:basic-auth *meetup-auth*
+                            :query-params {"status" status}
+                            :throw-exceptions false
+                            :as           :stream}))]
+      
+      (when (or (nil? resp) (not (http/success? resp)))
+        (println (str "Bad Response for: " meetup-group))
+        (-> resp
+            :body
+            io/reader)))))
+
+(comment
+
+  (dataset-reader {:meetup-group "flatiron-school-nyc" :status "past,upcoming"})
+  (dataset-reader {:meetup-group "flatironschool" :status "past,upcoming"})
+
+
+
+  (contains? ["ethbuilders"] "ethbuilders")
+  )
 
 (defn remove-nil-values [m]
   (->> m (partition 2) (apply concat) (filter #(some? (second %))) (into {})))
@@ -108,15 +126,62 @@
        (remove nil?) (into [])))
 
 (defn load-group-data [group]
-  (->> (dataset-reader {:meetup-group group :status "past,upcoming"})
-       (json/read-value )
-       (sort-by :time #(compare %2 %1))
-       (map event-document)
-       (apply concat)
-       (into [])
-       (xt/submit-tx xtdb-node)))
+  (Thread/sleep 200)
+  (let [reader (dataset-reader {:meetup-group group :status "past,upcoming"})]
+    (when reader
+      (->> reader
+           (json/read-value)
+           (sort-by :time #(compare %2 %1))
+           (map event-document)
+           (apply concat)
+           (into [])
+           (xt/submit-tx xtdb-node)))))
+
+(defn load-groups-data [v]
+  (Thread/sleep 2000)
+  (run! #(load-group-data %) v)
+  #_(run! #(prn (str "Yep! " %)) v))
 
 (comment
+
+  (->> (group-urlnames)
+       (partition 10)
+       (map #(into [] %))
+       (into [])
+       (run! #(load-groups-data %)))
+
+  (dataset-reader {:meetup-group "flatiron-school-nyc" :status "past,upcoming"})
+  (dataset-reader {:meetup-group "flatironschool" :status "past,upcoming"})
+
+
+
+  (load-group-data "flatiron-school-nyc")
+
+  (load-groups-data ["flatiron-school-nyc"
+                     "flatironschool"
+                     "cryptomondaysnyc"
+                     "BlockchainNYC"
+                     "blockchain101"
+                     "Chainlink-New-York"
+                     "chainlink"
+                     "ethbuilders"
+                     "BUIDL"
+                     "nyhackr"])
+
+
+  (->> (group-urlnames)
+       (take 10)
+       (mapv #(load-group-data %)))
+
+  (->> (group-urlnames)
+       (partition 10)
+       (map #(into [] %))
+       (into [])
+       #_first
+       (run! #(load-groups-data %))
+       #_(run! #(identity %)))
+
+  "Hi!!"
 
   (load-group-data "Papers-We-Love")
   (load-group-data "LispNYC")
@@ -126,12 +191,22 @@
   (tap> (load-group-data "Black-Designers-in-Tech-NYC"))
   (load-group-data "Build-with-Code-New-York")
   (load-group-data "BlockchainNYC")
+  (load-group-data "flutter-nyc")
+  (load-group-data "nyc-coders")
+  (load-group-data "flatiron-school-nyc")
 
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
        (json/read-value)
        (first)
        (spit "test/data/event.edn"))
-  
 
-,)
+  (dataset-reader {:meetup-group "flatiron-school-nyc" :status "past,upcoming"})
+  (dataset-reader {:meetup-group "flatironschool" :status "past,upcoming"})
+
+  (some->>
+   (dataset-reader {:meetup-group "flatiron-school-nyc" :status "past,upcoming"})
+   (prn "Hi!"))
+
+
+  )
