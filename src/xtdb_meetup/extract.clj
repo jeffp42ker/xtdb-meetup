@@ -4,7 +4,8 @@
             [jsonista.core :as json]
             [xtdb.api :as xt]
             [xtdb-meetup.auth-util :refer [*meetup-auth*]]
-            [xtdb-meetup.core :refer [xtdb-node]]))
+            [xtdb-meetup.core :refer [xtdb-node]]
+            [xtdb-meetup.query :refer [lookup-id]]))
 
 ; RESTful Meetup API v3
 (def host "https://api.meetup.com")
@@ -16,8 +17,8 @@
     (map (fn [[_ a]] a) (re-seq re html))))
 
 (comment
-  (tap> (group-urlnames))
-  )
+  (tap> (group-urlnames)))
+  
 
 (defn dataset-reader
   "Retrieve all group meetup events matching comma-delimited status \"past,upcoming\""
@@ -31,7 +32,6 @@
                             :query-params {"status" status}
                             :throw-exceptions false
                             :as           :stream}))]
-      
       (when (or (nil? resp) (not (http/success? resp)))
         (println (str "Bad Response for: " meetup-group))
         (-> resp
@@ -43,10 +43,11 @@
   (dataset-reader {:meetup-group "flatiron-school-nyc" :status "past,upcoming"})
   (dataset-reader {:meetup-group "flatironschool" :status "past,upcoming"})
 
-
+  (some-> nil http/success? not)
 
   (contains? ["ethbuilders"] "ethbuilders")
   )
+  
 
 (defn remove-nil-values [m]
   (->> m (partition 2) (apply concat) (filter #(some? (second %))) (into {})))
@@ -126,8 +127,8 @@
        (remove nil?) (into [])))
 
 (defn load-group-data [group]
-  (Thread/sleep 200)
-  (let [reader (dataset-reader {:meetup-group group :status "past,upcoming"})]
+  (let [id (lookup-id (xt/db xtdb-node) :meeting.group/name group)
+        reader (and (nil? id) (dataset-reader {:meetup-group group :status "past,upcoming"}))]
     (when reader
       (->> reader
            (json/read-value)
@@ -145,6 +146,7 @@
 (comment
 
   (->> (group-urlnames)
+       (take 60)
        (partition 10)
        (map #(into [] %))
        (into [])
@@ -167,6 +169,20 @@
                      "ethbuilders"
                      "BUIDL"
                      "nyhackr"])
+
+  (lookup-id (xt/db xtdb-node) :meetup.group/name "LispNYC")
+
+  (map #(lookup-id (xt/db xtdb-node) :meetup.group/name %) ["LispNYC"
+                                                            "flatiron-school-nyc"
+                                                            "flatironschool"
+                                                            "cryptomondaysnyc"
+                                                            "BlockchainNYC"
+                                                            "blockchain101"
+                                                            "Chainlink-New-York"
+                                                            "chainlink"
+                                                            "ethbuilders"
+                                                            "BUIDL"
+                                                            "nyhackr"])
 
 
   (->> (group-urlnames)
@@ -194,6 +210,7 @@
   (load-group-data "flutter-nyc")
   (load-group-data "nyc-coders")
   (load-group-data "flatiron-school-nyc")
+  (load-group-data "DigitalOceanNYC")
 
 
   (->> (dataset-reader {:meetup-group "LispNYC" :status "past,upcoming"})
@@ -206,7 +223,7 @@
 
   (some->>
    (dataset-reader {:meetup-group "flatiron-school-nyc" :status "past,upcoming"})
-   (prn "Hi!"))
+   (prn "Hi!")))
 
 
-  )
+  

@@ -4,6 +4,53 @@
    [xtdb-meetup.core :refer [xtdb-node]]
    [xtdb-meetup.util :as util]))
 
+
+(defn lookup-id [db k v]
+  (ffirst (xt/q db {:find '[doc]
+                    :where [['doc k v]]})))
+
+(defn lookup
+  "Returns the first document found with the given key and value.
+
+  For example:
+  (lookup db :user/email \"hello@example.com\")
+  => {:xt/id #uuid \"...\", :user/email \"hello@example.com\"}"
+  [db k v]
+   (xt/entity db (lookup-id db k v)))
+
+
+(defn groups []
+  (xt/q (xt/db xtdb-node)
+        '{:find [(pull ?group [*])]
+          :where [[?group :meetup/type :group]]}))
+
+(defn get-group [group-name]
+  (xt/q (xt/db xtdb-node)
+        '{:find [(pull ?group [*])]
+          :in [name]
+          :where [[?group :meetup/name name]
+                  [?group :meetup/type :group]]}
+        group-name)
+  )
+
+(comment
+
+(lookup (xt/db xtdb-node) :meetup.group/name "LispNYC")
+(lookup (xt/db xtdb-node) :meetup.group/name "DigitalOceanNYC")
+(xt/entity (xt/db xtdb-node)
+           (lookup-id (xt/db xtdb-node) :meetup.group/id 19817557))
+
+ (xt/entity (xt/db xtdb-node)
+            (lookup-id (xt/db xtdb-node) :meetup.group/name "Bogus"))
+
+
+  
+  (get-group "LispNYC")
+
+  (count (groups))
+  
+  )
+
 (defn group-venues [group-urlname]
   (let [headings [:urlname :max-date :min-date :meeting-count :coord :name-address]
         f-headers (fn [m] (into {} (mapv hash-map headings m)))]
@@ -95,6 +142,9 @@
 (comment
 
   (venues-without-a-name)
+
+
+  (group-venues "DigitalOceanNYC")
 
 
   (->> (venue-map "Jane Street") tap>)
